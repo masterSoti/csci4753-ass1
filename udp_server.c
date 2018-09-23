@@ -26,33 +26,60 @@ void error(char *msg)
   exit(1);
 }
 
-int reliablyPutFiles(int packetCounter, int totalPackets,
-                     char filedata[][BUFSIZE], int sockfd,
-                     struct sockaddr_in clientaddr, int clientlen, char *buf,
-                     int n)
+int stripHeader(char buf[BUFSIZE], char file[BUFSIZE - 100], int *index,
+                 int *totalPackets)
 {
-  int msec = 0, trigger = 30000; /* 30s */
-  clock_t before = clock();
-  while (packetCounter < totalPackets && msec < trigger)
+  int i;
+  for (i = 0; i < BUFSIZE - 100; i++)
+  {
+    file[i] = buf[i];
+  }
+  char tmpstr[100];
+  for (i = 0; i < 100; i++)
+  {
+    tmpstr[i] = buf[BUFSIZE - 100 + i];
+  }
+  *index = atoi(strtok(tmpstr, " "));
+  *totalPackets = atoi(strtok(NULL, " "));
+  char * sz = strtok(NULL, " ");
+  if (sz) {
+    return atoi(sz);
+  }else {
+    return 0;
+  }
+
+}
+
+int reliablyPutFiles(int packetCounter, int totalPackets,
+                     char filedata[][BUFSIZE-100], int sockfd,
+                     struct sockaddr_in clientaddr, int clientlen, char *buf,
+                     int n, int * size)
+{
+   while (packetCounter < totalPackets)
   {
     bzero(buf, BUFSIZE);
+
+    // if (packetCounter == totalPackets-1) {
+    //   printf("%s\n", filedata[(packetCounter-1)*2]);
+    // }
     n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *)&clientaddr,
                  &clientlen);
     if (n < 0)
       error("ERROR in recvfrom");
-    char toTokenize[strlen(buf)];
-    strcpy(toTokenize, buf);
-    int index = atoi(strtok(toTokenize, " "));
-    strtok(NULL, " ");
-    if (!strlen(filedata[index]))
+    char data[BUFSIZE - 100];
+    int index, _;
+    int tmpsize = stripHeader(buf, data, &index, &_);
+    if (index*2 == (totalPackets*2)-2) {
+      *size = tmpsize;
+    }
+    if (filedata[index*2][0] == '\0') // TODO: Binary null? filedata[index*2]
     {
       packetCounter++;
-      char *data = strtok(NULL, "");
-      strcpy(filedata[index], data);
+      memcpy(filedata[index*2], data, sizeof(filedata[index]));
+      
+
       printf("Received %d of %d packets\n", packetCounter, totalPackets);
     }
-    clock_t difference = clock() - before;
-    msec = difference * 1000 / CLOCKS_PER_SEC;
   }
   return packetCounter;
 }
@@ -223,6 +250,59 @@ int main(int argc, char **argv)
                  clientlen);
       if (n < 0)
         error("ERROR in sendto");
+            char getData[BUFSIZE];
+      bzero(getData, BUFSIZE);
+      n = recvfrom(sockfd, getData, BUFSIZE, 0, (struct sockaddr *)&clientaddr,
+                   &clientlen);
+      if (n < 0)
+        error("ERROR in recvfrom");
+      if (!strcmp(getData, "The file could not be opened\n") || !strcmp(getData, "Please enter a file name\n"))
+      {
+        continue;
+      }
+      char file[BUFSIZE - 100];
+      int index, totalPackets;
+      stripHeader(getData, file, &index, &totalPackets);
+      char filedata[totalPackets * 2][BUFSIZE - 100];
+      int i;
+      for (i = 0; i < totalPackets * 2; i++)
+      {
+        memcpy(filedata[i], "\0", sizeof(filedata[i]));
+      }
+      memcpy(filedata[index * 2], file, sizeof(filedata[index]));
+      int size;
+      printf("Received %d of %d packets\n", 1, totalPackets);
+      int packetCounter = reliablyPutFiles(1, totalPackets, filedata, sockfd,
+                                           clientaddr, clientlen, getData, n, &size);
+      /* int sanityCounter = 0; */
+      /* while (packetCounter < totalPackets && sanityCounter < 1000) { */
+      /*   n = sendto(sockfd, buf, strlen(buf), 0, (struct sockaddr *)&serveraddr, */
+      /*              serverlen); */
+      /*   if (n < 0) */
+      /*     error("ERROR in sendto"); */
+      /*   packetCounter = */
+      /*       reliablyGetFiles(packetCounter, totalPackets, filedata, sockfd, */
+      /*                        serveraddr, serverlen, getData, n); */
+      /*   sanityCounter++; */
+      /* } */
+      FILE *fp;
+      /* open the file for writing*/
+      fp = fopen("putFile", "wb");
+      /* write 10 lines of text into the file stream*/
+      for (i = 0; i < (totalPackets * 2) - 1; i++)
+      {
+
+        if (i % 2 == 0 && i < (totalPackets * 2) - 2)
+        {
+          /* printf("%d:===================================\n", i); */
+          fwrite(filedata[i], 1, BUFSIZE - 100, fp);
+        }
+      }
+      fwrite(filedata[i - 1], 1, size, fp);
+
+      /* fwrite(filedata[0], 1, strlen(filedata[i]), fp); */
+      /* close the file*/
+      fclose(fp);
     }
     else if (!strcmp(command, "ls"))
     {

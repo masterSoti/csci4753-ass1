@@ -24,7 +24,7 @@ void error(char *msg)
 }
 
 int stripHeader(char buf[BUFSIZE], char file[BUFSIZE - 100], int *index,
-                 int *totalPackets)
+                int *totalPackets)
 {
   int i;
   for (i = 0; i < BUFSIZE - 100; i++)
@@ -38,19 +38,21 @@ int stripHeader(char buf[BUFSIZE], char file[BUFSIZE - 100], int *index,
   }
   *index = atoi(strtok(tmpstr, " "));
   *totalPackets = atoi(strtok(NULL, " "));
-  char * sz = strtok(NULL, " ");
-  if (sz) {
+  char *sz = strtok(NULL, " ");
+  if (sz)
+  {
     return atoi(sz);
-  }else {
+  }
+  else
+  {
     return 0;
   }
-
 }
 
 int reliablyGetFiles(int packetCounter, int totalPackets,
                      char filedata[][BUFSIZE - 100], int sockfd,
                      struct sockaddr_in serveraddr, int serverlen, char *buf,
-                     int n, int * size)
+                     int n, int *size)
 {
   while (packetCounter < totalPackets)
   {
@@ -66,24 +68,19 @@ int reliablyGetFiles(int packetCounter, int totalPackets,
     char data[BUFSIZE - 100];
     int index, _;
     int tmpsize = stripHeader(buf, data, &index, &_);
-    if (index*2 == (totalPackets*2)-2) {
+    if (index * 2 == (totalPackets * 2) - 2)
+    {
       *size = tmpsize;
     }
-    if (filedata[index*2][0] == '\0') // TODO: Binary null? filedata[index*2]
+    if (filedata[index * 2][0] == '\0') // TODO: Binary null? filedata[index*2]
     {
       packetCounter++;
-      memcpy(filedata[index*2], data, sizeof(filedata[index]));
-      
+      memcpy(filedata[index * 2], data, sizeof(filedata[index]));
 
       printf("Received %d of %d packets\n", packetCounter, totalPackets);
     }
   }
   // for (int i = 0; i < totalPackets; i++)
-
-#ifndef UNICODE
-#define UNICODE
-
-#endif
   // {
   //   printf("%s\n", filedata[i]);
   // }
@@ -171,9 +168,54 @@ int main(int argc, char **argv)
       {
         FILE *fp;
         fileName[strlen(fileName) - 1] = '\0';
-        fp = fopen(fileName, "r+b");
+        fp = fopen(fileName, "rb");
         if (fp)
         {
+          fseek(fp, 0, SEEK_END);
+          long fsize = ftell(fp);
+          fseek(fp, 0, SEEK_SET); // same as rewind(f);
+          int sizeOfPackets = BUFSIZE - 100;
+          int numPackets = (fsize / sizeOfPackets) + 1;
+          int index = 0;
+
+          while (index < numPackets)
+          {
+            char fileChunk[BUFSIZE];
+            bzero(fileChunk, BUFSIZE);
+            fread(fileChunk, 1, sizeOfPackets, fp);
+            /* this is the string for the frame */
+            char tmpstr[100];
+            bzero(tmpstr, 100);
+            char numbToStr[BUFSIZE];
+            sprintf(numbToStr, "%d", index);
+            strcat(tmpstr, numbToStr);
+            strcat(tmpstr, " ");
+            sprintf(numbToStr, "%d", numPackets);
+            strcat(tmpstr, numbToStr);
+            strcat(tmpstr, " ");
+
+            printf("%d\n", fsize);
+            if (index == numPackets - 1)
+            {
+              sprintf(numbToStr, "%d", fsize);
+              strcat(tmpstr, numbToStr);
+              strcat(tmpstr, " ");
+            }
+            fsize -= sizeOfPackets;
+
+            int i;
+            for (i = 0; i < 99; i++)
+            {
+              fileChunk[sizeOfPackets + i] = tmpstr[i];
+            }
+            n = sendto(sockfd, fileChunk, sizeof(fileChunk), 0,
+                       (struct sockaddr *)&serveraddr, serverlen);
+            if (n < 0)
+              error("ERROR in sendto");
+            index++;
+            printf("Sent %d of %d packets\n", index, numPackets);
+          }
+          fclose(fp);
         }
         else
         {
@@ -210,13 +252,13 @@ int main(int argc, char **argv)
       char file[BUFSIZE - 100];
       int index, totalPackets;
       stripHeader(getData, file, &index, &totalPackets);
-      char filedata[totalPackets*2][BUFSIZE - 100];
+      char filedata[totalPackets * 2][BUFSIZE - 100];
       int i;
-      for (i = 0; i < totalPackets*2; i++)
+      for (i = 0; i < totalPackets * 2; i++)
       {
         memcpy(filedata[i], "\0", sizeof(filedata[i]));
       }
-      memcpy(filedata[index*2], file, sizeof(filedata[index]));
+      memcpy(filedata[index * 2], file, sizeof(filedata[index]));
       int size;
       printf("Received %d of %d packets\n", 1, totalPackets);
       int packetCounter = reliablyGetFiles(1, totalPackets, filedata, sockfd,
@@ -236,17 +278,17 @@ int main(int argc, char **argv)
       /* open the file for writing*/
       fp = fopen("getFile", "wb");
       /* write 10 lines of text into the file stream*/
-      for (i = 0; i < (totalPackets*2) - 1; i++)
+      for (i = 0; i < (totalPackets * 2) - 1; i++)
       {
-        
-        if (i%2 == 0 && i < (totalPackets*2)-2) {
+
+        if (i % 2 == 0 && i < (totalPackets * 2) - 2)
+        {
           /* printf("%d:===================================\n", i); */
-          fwrite(filedata[i], 1, BUFSIZE-100, fp);
+          fwrite(filedata[i], 1, BUFSIZE - 100, fp);
         }
-        
       }
-      fwrite(filedata[i-1], 1, size, fp);
-      
+      fwrite(filedata[i - 1], 1, size, fp);
+
       /* fwrite(filedata[0], 1, strlen(filedata[i]), fp); */
       /* close the file*/
       fclose(fp);
