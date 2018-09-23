@@ -20,7 +20,8 @@
 /*
  * error - wrapper for perror
  */
-void error(char *msg) {
+void error(char *msg)
+{
   perror(msg);
   exit(1);
 }
@@ -28,10 +29,12 @@ void error(char *msg) {
 int reliablyPutFiles(int packetCounter, int totalPackets,
                      char filedata[][BUFSIZE], int sockfd,
                      struct sockaddr_in clientaddr, int clientlen, char *buf,
-                     int n) {
+                     int n)
+{
   int msec = 0, trigger = 30000; /* 30s */
   clock_t before = clock();
-  while (packetCounter < totalPackets && msec < trigger) {
+  while (packetCounter < totalPackets && msec < trigger)
+  {
     bzero(buf, BUFSIZE);
     n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *)&clientaddr,
                  &clientlen);
@@ -41,7 +44,8 @@ int reliablyPutFiles(int packetCounter, int totalPackets,
     strcpy(toTokenize, buf);
     int index = atoi(strtok(toTokenize, " "));
     strtok(NULL, " ");
-    if (!strlen(filedata[index])) {
+    if (!strlen(filedata[index]))
+    {
       packetCounter++;
       char *data = strtok(NULL, "");
       strcpy(filedata[index], data);
@@ -53,7 +57,8 @@ int reliablyPutFiles(int packetCounter, int totalPackets,
   return packetCounter;
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
   int sockfd;                    /* socket */
   int portno;                    /* port to listen on */
   int clientlen;                 /* byte size of client's address */
@@ -68,7 +73,8 @@ int main(int argc, char **argv) {
   /*
    * check command line arguments
    */
-  if (argc != 2) {
+  if (argc != 2)
+  {
     fprintf(stderr, "usage: %s <port>\n", argv[0]);
     exit(1);
   }
@@ -108,7 +114,8 @@ int main(int argc, char **argv) {
    * main loop: wait for a datagram, then echo it
    */
   clientlen = sizeof(clientaddr);
-  while (1) {
+  while (1)
+  {
 
     /*
      * recvfrom: receive a UDP datagram from a client
@@ -137,11 +144,14 @@ int main(int argc, char **argv) {
 
     char *command = strtok(newBuf, " ");
     char *fileName = strtok(NULL, " ");
-    if (!strcmp(command, "get")) {
-      if (fileName) {
+    if (!strcmp(command, "get"))
+    {
+      if (fileName)
+      {
         FILE *fp;
         fp = fopen(fileName, "rb");
-        if (fp) {
+        if (fp)
+        {
 
           fseek(fp, 0, SEEK_END);
           long fsize = ftell(fp);
@@ -150,24 +160,25 @@ int main(int argc, char **argv) {
           int numPackets = (fsize / sizeOfPackets) + 1;
           int index = 0;
 
-          while (index < numPackets) {
+          while (index < numPackets)
+          {
             char fileChunk[BUFSIZE];
             bzero(fileChunk, BUFSIZE);
             fread(fileChunk, 1, sizeOfPackets, fp);
-            /* char tmpSubStr[BUFSIZE]; */
+            /* this is the string for the frame */
             char tmpstr[100];
             bzero(tmpstr, 100);
             char numbToStr[BUFSIZE];
-
-
             sprintf(numbToStr, "%d", index);
             strcat(tmpstr, numbToStr);
             strcat(tmpstr, " ");
             sprintf(numbToStr, "%d", numPackets);
             strcat(tmpstr, numbToStr);
             strcat(tmpstr, " ");
+
             int i;
-            for (i = 0; i < 100; i++) {
+            for (i = 0; i < 100; i++)
+            {
               fileChunk[sizeOfPackets + i] = tmpstr[i];
             }
             n = sendto(sockfd, fileChunk, sizeof(fileChunk), 0,
@@ -178,39 +189,50 @@ int main(int argc, char **argv) {
             printf("Sent %d of %d packets\n", index, numPackets);
           }
           fclose(fp);
-        } else {
+        }
+        else
+        {
           char *errMsg = "The file could not be opened\n";
           n = sendto(sockfd, errMsg, strlen(errMsg), 0,
                      (struct sockaddr *)&clientaddr, clientlen);
           if (n < 0)
             error("ERROR in sendto");
         }
-      } else {
+      }
+      else
+      {
         char *errMsg = "Please enter a file name\n";
         n = sendto(sockfd, errMsg, strlen(errMsg), 0,
                    (struct sockaddr *)&clientaddr, clientlen);
         if (n < 0)
           error("ERROR in sendto");
       }
-    } else if (!strcmp(command, "put")) {
+    }
+    else if (!strcmp(command, "put"))
+    {
       char *ack = "ACK!\n";
       n = sendto(sockfd, ack, strlen(ack), 0, (struct sockaddr *)&clientaddr,
                  clientlen);
       if (n < 0)
         error("ERROR in sendto");
-    } else if (!strcmp(command, "ls")) {
+    }
+    else if (!strcmp(command, "ls"))
+    {
       DIR *dp;
       struct dirent *ep;
       dp = opendir("./");
 
-      if (dp != NULL) {
+      if (dp != NULL)
+      {
         int counter = 0;
-        while (ep = readdir(dp)) {
+        while (ep = readdir(dp))
+        {
           counter += strlen(ep->d_name) + 1;
         }
         char listOfFiles[counter + 2];
         rewinddir(dp);
-        while (ep = readdir(dp)) {
+        while (ep = readdir(dp))
+        {
           strcat(listOfFiles, ep->d_name);
           strcat(listOfFiles, " ");
         }
@@ -220,29 +242,41 @@ int main(int argc, char **argv) {
                    (struct sockaddr *)&clientaddr, clientlen);
         if (n < 0)
           error("ERROR in sendto");
-      } else {
+      }
+      else
+      {
         char *listOfFiles = "The directory can not be opened\n";
         n = sendto(sockfd, listOfFiles, strlen(listOfFiles), 0,
                    (struct sockaddr *)&clientaddr, clientlen);
         if (n < 0)
           error("ERROR in sendto");
       }
-    } else if (!strcmp(command, "delete")) {
+    }
+    else if (!strcmp(command, "delete"))
+    {
       char *messageToReturn;
-      if (fileName) {
-        if (remove(fileName) == 0) {
+      if (fileName)
+      {
+        if (remove(fileName) == 0)
+        {
           messageToReturn = "Deleted the specified file\n";
-        } else {
+        }
+        else
+        {
           messageToReturn = "Could not delete the specified file\n";
         }
-      } else {
+      }
+      else
+      {
         messageToReturn = "Please specify a fileName\n";
       }
       n = sendto(sockfd, messageToReturn, strlen(messageToReturn), 0,
                  (struct sockaddr *)&clientaddr, clientlen);
       if (n < 0)
         error("ERROR in sendto");
-    } else if (!strcmp(command, "exit")) {
+    }
+    else if (!strcmp(command, "exit"))
+    {
       char *toReturn = "Exit Called\n";
       printf("%s\n", toReturn);
       n = sendto(sockfd, toReturn, strlen(toReturn), 0,
@@ -252,7 +286,9 @@ int main(int argc, char **argv) {
       close(sockfd);
       bzero(buf, BUFSIZE);
       break;
-    } else {
+    }
+    else
+    {
       printf("none of these\n");
       /*
        * sendto: echo the input back to the client
