@@ -14,6 +14,7 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+#include <sys/time.h>
 
 #define BUFSIZE 1024
 
@@ -27,7 +28,7 @@ void error(char *msg)
 }
 
 int stripHeader(char buf[BUFSIZE], char file[BUFSIZE - 100], int *index,
-                 int *totalPackets)
+                int *totalPackets)
 {
   int i;
   for (i = 0; i < BUFSIZE - 100; i++)
@@ -41,21 +42,23 @@ int stripHeader(char buf[BUFSIZE], char file[BUFSIZE - 100], int *index,
   }
   *index = atoi(strtok(tmpstr, " "));
   *totalPackets = atoi(strtok(NULL, " "));
-  char * sz = strtok(NULL, " ");
-  if (sz) {
+  char *sz = strtok(NULL, " ");
+  if (sz)
+  {
     return atoi(sz);
-  }else {
+  }
+  else
+  {
     return 0;
   }
-
 }
 
 int reliablyPutFiles(int packetCounter, int totalPackets,
-                     char filedata[][BUFSIZE-100], int sockfd,
+                     char filedata[][BUFSIZE - 100], int sockfd,
                      struct sockaddr_in clientaddr, int clientlen, char *buf,
-                     int n, int * size)
+                     int n, int *size)
 {
-   while (packetCounter < totalPackets)
+  while (packetCounter < totalPackets)
   {
     bzero(buf, BUFSIZE);
 
@@ -64,19 +67,20 @@ int reliablyPutFiles(int packetCounter, int totalPackets,
     // }
     n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *)&clientaddr,
                  &clientlen);
-    if (n < 0)
-      error("ERROR in recvfrom");
+    if (n < 0){
+      break;
+    }
     char data[BUFSIZE - 100];
     int index, _;
     int tmpsize = stripHeader(buf, data, &index, &_);
-    if (index*2 == (totalPackets*2)-2) {
+    if (index * 2 == (totalPackets * 2) - 2)
+    {
       *size = tmpsize;
     }
-    if (filedata[index*2][0] == '\0') // TODO: Binary null? filedata[index*2]
+    if (filedata[index * 2][0] == '\0') // TODO: Binary null? filedata[index*2]
     {
       packetCounter++;
-      memcpy(filedata[index*2], data, sizeof(filedata[index]));
-      
+      memcpy(filedata[index * 2], data, sizeof(filedata[index]));
 
       printf("Received %d of %d packets\n", packetCounter, totalPackets);
     }
@@ -122,6 +126,14 @@ int main(int argc, char **argv)
   optval = 1;
   setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval,
              sizeof(int));
+  
+  struct timeval timeout;
+  timeout.tv_sec = 10;
+  timeout.tv_usec = 0;
+
+  // if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout,
+  //                sizeof(timeout)) < 0)
+  //   error("setsockopt failed\n");
 
   /*
    * build the server's Internet address
@@ -166,6 +178,7 @@ int main(int argc, char **argv)
     printf("server received datagram from %s (%s)\n", hostp->h_name, hostaddrp);
 
     printf("server received %d/%d bytes: %s\n", strlen(buf), n, buf);
+    printf("HERE\n");
 
     char *newBuf = strtok(buf, "\n");
 
@@ -203,14 +216,14 @@ int main(int argc, char **argv)
             strcat(tmpstr, numbToStr);
             strcat(tmpstr, " ");
 
-            printf("%d\n", fsize);
-            if (index == numPackets-1) {
+            if (index == numPackets - 1)
+            {
               sprintf(numbToStr, "%d", fsize);
               strcat(tmpstr, numbToStr);
               strcat(tmpstr, " ");
             }
             fsize -= sizeOfPackets;
-            
+
             int i;
             for (i = 0; i < 99; i++)
             {
@@ -250,7 +263,7 @@ int main(int argc, char **argv)
                  clientlen);
       if (n < 0)
         error("ERROR in sendto");
-            char getData[BUFSIZE];
+      char getData[BUFSIZE];
       bzero(getData, BUFSIZE);
       n = recvfrom(sockfd, getData, BUFSIZE, 0, (struct sockaddr *)&clientaddr,
                    &clientlen);
@@ -274,17 +287,22 @@ int main(int argc, char **argv)
       printf("Received %d of %d packets\n", 1, totalPackets);
       int packetCounter = reliablyPutFiles(1, totalPackets, filedata, sockfd,
                                            clientaddr, clientlen, getData, n, &size);
-      /* int sanityCounter = 0; */
-      /* while (packetCounter < totalPackets && sanityCounter < 1000) { */
-      /*   n = sendto(sockfd, buf, strlen(buf), 0, (struct sockaddr *)&serveraddr, */
-      /*              serverlen); */
-      /*   if (n < 0) */
-      /*     error("ERROR in sendto"); */
-      /*   packetCounter = */
-      /*       reliablyGetFiles(packetCounter, totalPackets, filedata, sockfd, */
-      /*                        serveraddr, serverlen, getData, n); */
-      /*   sanityCounter++; */
-      /* } */
+      int sanityCounter = 0;
+      strcpy(buf, "sendAgain!");
+      while (packetCounter < totalPackets && sanityCounter < 1000)
+      {
+        n = sendto(sockfd, buf, strlen(buf), 0, (struct sockaddr *)&clientaddr,
+                   clientlen);
+        if (n < 0)
+          error("ERROR in sendto");
+        packetCounter =
+            reliablyPutFiles(packetCounter, totalPackets, filedata, sockfd,
+                             clientaddr, clientlen, getData, n, &size);
+        sanityCounter++;
+      }
+      strcpy(buf, "ack!");
+      n = sendto(sockfd, buf, strlen(buf), 0, (struct sockaddr *)&clientaddr,
+                   clientlen);
       FILE *fp;
       /* open the file for writing*/
       fp = fopen("putFile", "wb");
