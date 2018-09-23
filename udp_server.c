@@ -149,7 +149,7 @@ int main(int argc, char **argv)
       if (fileName)
       {
         FILE *fp;
-        fp = fopen(fileName, "rb");
+        fp = fopen(fileName, "rb"); //change
         if (fp)
         {
 
@@ -176,8 +176,16 @@ int main(int argc, char **argv)
             strcat(tmpstr, numbToStr);
             strcat(tmpstr, " ");
 
+            printf("%d\n", fsize);
+            if (index == numPackets-1) {
+              sprintf(numbToStr, "%d", fsize);
+              strcat(tmpstr, numbToStr);
+              strcat(tmpstr, " ");
+            }
+            fsize -= sizeOfPackets;
+            
             int i;
-            for (i = 0; i < 100; i++)
+            for (i = 0; i < 99; i++)
             {
               fileChunk[sizeOfPackets + i] = tmpstr[i];
             }

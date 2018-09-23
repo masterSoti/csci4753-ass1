@@ -23,7 +23,7 @@ void error(char *msg)
   exit(0);
 }
 
-void stripHeader(char buf[BUFSIZE], char file[BUFSIZE - 100], int *index,
+int stripHeader(char buf[BUFSIZE], char file[BUFSIZE - 100], int *index,
                  int *totalPackets)
 {
   int i;
@@ -38,14 +38,19 @@ void stripHeader(char buf[BUFSIZE], char file[BUFSIZE - 100], int *index,
   }
   *index = atoi(strtok(tmpstr, " "));
   *totalPackets = atoi(strtok(NULL, " "));
-  // file[BUFSIZE-100-1] = '\0';
-  // printf("%c\n", file[BUFSIZE-100]);
+  char * sz = strtok(NULL, " ");
+  if (sz) {
+    return atoi(sz);
+  }else {
+    return 0;
+  }
+
 }
 
 int reliablyGetFiles(int packetCounter, int totalPackets,
                      char filedata[][BUFSIZE - 100], int sockfd,
                      struct sockaddr_in serveraddr, int serverlen, char *buf,
-                     int n)
+                     int n, int * size)
 {
   while (packetCounter < totalPackets)
   {
@@ -60,7 +65,10 @@ int reliablyGetFiles(int packetCounter, int totalPackets,
       error("ERROR in recvfrom");
     char data[BUFSIZE - 100];
     int index, _;
-    stripHeader(buf, data, &index, &_);
+    int tmpsize = stripHeader(buf, data, &index, &_);
+    if (index*2 == (totalPackets*2)-2) {
+      *size = tmpsize;
+    }
     if (filedata[index*2][0] == '\0') // TODO: Binary null? filedata[index*2]
     {
       packetCounter++;
@@ -71,6 +79,11 @@ int reliablyGetFiles(int packetCounter, int totalPackets,
     }
   }
   // for (int i = 0; i < totalPackets; i++)
+
+#ifndef UNICODE
+#define UNICODE
+
+#endif
   // {
   //   printf("%s\n", filedata[i]);
   // }
@@ -158,7 +171,7 @@ int main(int argc, char **argv)
       {
         FILE *fp;
         fileName[strlen(fileName) - 1] = '\0';
-        fp = fopen(fileName, "rb");
+        fp = fopen(fileName, "r+b");
         if (fp)
         {
         }
@@ -204,11 +217,10 @@ int main(int argc, char **argv)
         memcpy(filedata[i], "\0", sizeof(filedata[i]));
       }
       memcpy(filedata[index*2], file, sizeof(filedata[index]));
-
+      int size;
       printf("Received %d of %d packets\n", 1, totalPackets);
       int packetCounter = reliablyGetFiles(1, totalPackets, filedata, sockfd,
-                                           serveraddr, serverlen, getData, n);
-
+                                           serveraddr, serverlen, getData, n, &size);
       /* int sanityCounter = 0; */
       /* while (packetCounter < totalPackets && sanityCounter < 1000) { */
       /*   n = sendto(sockfd, buf, strlen(buf), 0, (struct sockaddr *)&serveraddr, */
@@ -221,19 +233,20 @@ int main(int argc, char **argv)
       /*   sanityCounter++; */
       /* } */
       FILE *fp;
-
       /* open the file for writing*/
-      fp = fopen("getFile", "w");
+      fp = fopen("getFile", "wb");
       /* write 10 lines of text into the file stream*/
-      for (i = 0; i < totalPackets*2; i++)
+      for (i = 0; i < (totalPackets*2) - 1; i++)
       {
         
-        if (i%2 == 0) {
+        if (i%2 == 0 && i < (totalPackets*2)-2) {
           /* printf("%d:===================================\n", i); */
-          fwrite(filedata[i], 1, strlen(filedata[i]), fp);
+          fwrite(filedata[i], 1, BUFSIZE-100, fp);
         }
         
       }
+      fwrite(filedata[i-1], 1, size, fp);
+      
       /* fwrite(filedata[0], 1, strlen(filedata[i]), fp); */
       /* close the file*/
       fclose(fp);
