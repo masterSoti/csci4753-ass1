@@ -127,9 +127,9 @@ int main(int argc, char **argv)
   setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (const void *)&optval,
              sizeof(int));
   
-  struct timeval timeout;
-  timeout.tv_sec = 10;
-  timeout.tv_usec = 0;
+  // struct timeval timeout;
+  // timeout.tv_sec = 10;
+  // timeout.tv_usec = 0;
 
   // if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout,
   //                sizeof(timeout)) < 0)
@@ -178,7 +178,6 @@ int main(int argc, char **argv)
     printf("server received datagram from %s (%s)\n", hostp->h_name, hostaddrp);
 
     printf("server received %d/%d bytes: %s\n", strlen(buf), n, buf);
-    printf("HERE\n");
 
     char *newBuf = strtok(buf, "\n");
 
@@ -269,10 +268,6 @@ int main(int argc, char **argv)
                    &clientlen);
       if (n < 0)
         error("ERROR in recvfrom");
-      if (!strcmp(getData, "The file could not be opened\n") || !strcmp(getData, "Please enter a file name\n"))
-      {
-        continue;
-      }
       char file[BUFSIZE - 100];
       int index, totalPackets;
       stripHeader(getData, file, &index, &totalPackets);

@@ -106,8 +106,9 @@ int reliablyGetFiles(int packetCounter, int totalPackets,
     // }
     n = recvfrom(sockfd, buf, BUFSIZE, 0, (struct sockaddr *)&serveraddr,
                  &serverlen);
-    if (n < 0)
-      error("ERROR in recvfrom");
+    if (n < 0){
+      break;
+    }
     char data[BUFSIZE - 100];
     int index, _;
     int tmpsize = stripHeader(buf, data, &index, &_);
@@ -170,6 +171,14 @@ int main(int argc, char **argv)
         server->h_length);
   serveraddr.sin_port = htons(portno);
 
+  
+  struct timeval timeout;
+  timeout.tv_sec = 10;
+  timeout.tv_usec = 0;
+  if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout,
+                 sizeof(timeout)) < 0)
+    error("setsockopt failed\n");
+
   while (1)
   {
 
@@ -224,11 +233,9 @@ int main(int argc, char **argv)
           char *getData[BUFSIZE];
           n = recvfrom(sockfd, getData, BUFSIZE, 0, (struct sockaddr *)&serveraddr,
                        &serverlen);
-          sleep(5);
-          while (!strcmp("sendAgain!", getData))
+          while (!strcmp("sendAgain!", getData) || n<0)
           {
             reliablySendFiles(sizeOfPackets, fsize, sockfd, serveraddr, serverlen, fp);
-            sleep(5);
             n = recvfrom(sockfd, getData, BUFSIZE, 0, (struct sockaddr *)&serveraddr,
                          &serverlen);
           }
