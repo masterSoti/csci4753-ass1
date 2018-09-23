@@ -58,8 +58,7 @@ int reliablyGetFiles(int packetCounter, int totalPackets, char filedata[][BUFSIZ
         {
             packetCounter++;
             char *data = strtok(NULL, "");
-            // fwrite(filedata[index], 1,  n, data);
-            memcpy(filedata[index], data, sizeof(data));
+            strcpy(filedata[index], data);
             printf("Received %d of %d packets\n", packetCounter, totalPackets);
         }
         clock_t difference = clock() - before;
